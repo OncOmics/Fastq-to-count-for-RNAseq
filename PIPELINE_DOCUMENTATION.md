@@ -89,13 +89,27 @@ rm ~/ncbi/public/sra/SRR123456.sra
 
 ## Step 4: Run the Pipeline
 
-The `pipeline.sh` script is designed with two execution modes for maximum flexibility.
+The `pipeline.sh` script is designed with professional command-line features to be both user-friendly and highly flexible.
 
-### Mode 1: Automated Full Execution (Recommended for Production)
+### Understanding the Command Structure and Design
 
-This mode runs the entire pipeline from start to finish automatically. It is the standard way to process your data.
+The script was intentionally designed to move beyond simple positional arguments (like `$1`, `$2`) to a more robust "flag-based" system. Here’s why this is a superior approach:
 
-#### Command Structure and Parameters
+*   **Professional Argument Parsing (Flags)**: Instead of relying on a strict order of arguments, the script uses named flags (e.g., `--input`, `-t`). This is the standard for professional command-line tools.
+    *   **Why?** It makes the command self-documenting and less prone to user error. You don't have to remember if threads come before or after the output directory, and you can supply arguments in any order.
+
+*   **Clear Default Values**: All optional arguments have sensible defaults (e.g., 4 threads, 20GB RAM).
+    *   **Why?** This allows a user to run the pipeline with a minimal command, making it easy to get started. Advanced users can then override these defaults as needed without modifying the script's code.
+
+*   **Customizable Tool Parameters**: Critical parameters for internal tools, which were previously "hardcoded," are now exposed as command-line flags.
+    *   `--ram`: Controls the `--limitBAMsortRAM` parameter in STAR.
+    *   `--overhang`: Controls the `--sjdbOverhang` parameter in STAR.
+    *   **Why?** This provides essential flexibility. A user on a high-memory server can increase the RAM limit for better performance, while a user on a resource-constrained machine can lower it to prevent crashes. Similarly, the overhang can be tuned precisely to the read length of a specific experiment.
+
+*   **Built-in Help Message**: The script includes a `--help` flag.
+    *   **Why?** This makes the script self-contained. A user can quickly see all available options and how to use them without needing to read the entire script or documentation.
+
+### Command Parameters
 
 | Flag | Argument | Description | Required? | Default |
 | :--- | :--- | :--- | :--- | :--- |
@@ -106,74 +120,62 @@ This mode runs the entire pipeline from start to finish automatically. It is the
 | `-s`, `--overhang`| Integer | Value for STAR's `sjdbOverhang` (Rule: `read_length - 1`). | No | `99` |
 | `-h`, `--help` | N/A | Displays the help message and exits. | N/A | N/A |
 
-#### Example Execution
+### Example Executions
+
+#### Basic Usage
+This is the simplest way to run the pipeline, using the default settings for memory and overhang.
 
 ```bash
 ./pipeline.sh --input raw_data --output results --threads 8
 ```
 
-### Mode 2: Interactive Step-by-Step Execution (for Debugging)
+#### Advanced Usage (Customizing Parameters)
+This example is tailored for a more powerful server and longer reads, overriding the default RAM and overhang values.
 
-This mode is designed for debugging or running specific parts of the pipeline. By using the `source` command, you load all the script's functions into your terminal without executing them, allowing you to call them manually.
-
-1.  **First, source the script, providing the arguments as you normally would:**
-    ```bash
-    source pipeline.sh --input raw_data --output results --threads 8
-    ```
-    This will set up all the necessary variables but will **not** start the pipeline.
-
-2.  **Now, you can execute each function individually.** For example:
-    ```bash
-    # Run only the first two steps to check initial QC
-    prepare_and_merge_lanes
-    run_fastqc_raw
-
-    # After inspecting the QC, you can continue
-    run_trimming
-    run_fastqc_trimmed
-
-    # Or, if you want to run the entire sequence from this point
-    main
-    ```
-
-### How Dual-Execution Works: The "Execution Trigger"
-
-This flexibility is made possible by the final block in the `pipeline.sh` script:
 ```bash
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main
-fi
+# Example for a 32-core server with 64GB RAM, processing 150bp reads
+./pipeline.sh \
+  --input raw_data \
+  --output results \
+  --threads 16 \
+  --ram 50G \
+  --overhang 149
 ```
-*   When you run the script directly (`./pipeline.sh`), the script's name (`$0`) is the same as its source file path (`${BASH_SOURCE[0]}`). The condition is **true**, and the `main` function is automatically executed.
-*   When you `source` the script, your terminal is the program executing (`$0`), which is different from the script's file path. The condition is **false**, and the `main` function is **not** executed, leaving the functions ready for you to call manually.
 
-## Understanding the Pipeline Functions
+## Detailed Breakdown of Pipeline Functions
 
-The `pipeline.sh` script is composed of several modular functions. Here is a detailed description of what each one does.
+The `pipeline.sh` script is composed of several modular functions. Here is a description of what each one does.
 
 *   `prepare_and_merge_lanes()`
-    This function prepares the raw FASTQ files. It intelligently detects if a sample is split across multiple files (lanes). If so, it concatenates them. If a sample has only one R1 and one R2 file, it creates efficient **symbolic links** instead of making slow file copies, saving significant time and disk space.
+    Prepares raw FASTQ files. It detects if a sample is split across multiple files (lanes) and concatenates them. If a sample has only one file per read, it creates efficient **symbolic links** instead of making slow file copies, saving time and disk space.
 
 *   `run_fastqc_raw()`
-    This function performs the initial quality control step. It runs **FastQC** on all prepared FASTQ files and then uses **MultiQC** to aggregate all the individual reports into a single, easy-to-read HTML summary.
+    Performs initial quality control. It runs **FastQC** on all prepared FASTQ files and then uses **MultiQC** to aggregate the individual reports into a single HTML summary.
 
 *   `run_trimming()`
-    This function cleans the raw reads. It uses **Trimmomatic** to remove any remaining Illumina adapter sequences and to trim low-quality bases from the ends of the reads, improving the accuracy of the downstream alignment.
+    Cleans the raw reads using **Trimmomatic** to remove Illumina adapter sequences and trim low-quality bases from the ends, improving downstream alignment accuracy.
 
 *   `run_fastqc_trimmed()`
-    After trimming, this function re-runs **FastQC** and **MultiQC** on the cleaned FASTQ files. This allows you to directly compare the "before" and "after" quality reports to verify that the trimming step was effective.
+    Re-runs **FastQC** and **MultiQC** on the cleaned FASTQ files, allowing for a direct "before and after" comparison to verify trimming effectiveness.
 
 *   `prepare_reference_genome()`
-    This function ensures the necessary reference files are available. It checks for the reference genome (FASTA) and gene annotation (GTF) files and downloads them from Ensembl if they are not found.
+    Ensures the necessary reference files (FASTA genome and GTF annotation) are available, downloading them from Ensembl if not found.
 
 *   `index_reference_genome()`
-    Before alignment, the aligner (STAR) requires the reference genome to be in a special, pre-processed format called an index. This function runs the `STAR --runMode genomeGenerate` command to create this index. It also checks if an index already exists to avoid re-running this time-consuming step. The `sjdbOverhang` parameter, customizable via the `--overhang` flag, is used here.
+    Creates a STAR index from the reference genome, a required pre-processing step for the aligner. It checks if an index already exists to avoid re-running this time-consuming step. The `sjdbOverhang` parameter (customizable via `--overhang`) is used here.
 
 *   `align_reads()`
-    This is the core alignment step. The function iterates through each sample's trimmed FASTQ files and uses `STAR --runMode alignReads` to map them to the reference genome. During this process, it also performs the initial gene-level quantification (`--quantMode GeneCounts`) and generates a sorted BAM file for each sample. The memory for this step is controlled by the `--ram` flag.
+    The core alignment step. It maps reads to the reference genome using STAR. During this process, it also performs the initial gene-level quantification (`--quantMode GeneCounts`) and generates a sorted BAM file. The memory for this step is controlled by the `--ram` flag.
 
 *   `determine_strandedness_and_aggregate()`
-    This is the final, intelligent step. The function automatically runs `infer_experiment.py` (from RSeQC) on a sample BAM file to determine the library's strandedness. It then parses the result to decide whether the data is unstranded, stranded-forward, or stranded-reverse. Finally, it calls the `aggregate_counts.R` script, passing it the correct column number to use for building the final, scientifically accurate count matrix.
+    The final, intelligent step. It automatically runs `infer_experiment.py` on a sample BAM file to determine the library's strandedness. It then calls the `aggregate_counts.R` script, passing it the correct column number to use for building the final, scientifically accurate count matrix.
+
+## Understanding the Dual-Execution Mode
+
+For advanced users and debugging, the pipeline supports an interactive execution mode. This is made possible by the "Execution Trigger" at the end of the `pipeline.sh` script.
+
+*   **Automated Execution (`./pipeline.sh ...`)**: When run directly, the script executes the `main` function, running all steps in sequence.
+*   **Interactive Execution (`source pipeline.sh ...`)**: When you `source` the script, it loads all functions and variables into your terminal but **does not** run `main`. This allows you to execute each function manually, one at a time, to inspect intermediate results or debug a specific step.
 
 ## Understanding the Final Output Structure
 
