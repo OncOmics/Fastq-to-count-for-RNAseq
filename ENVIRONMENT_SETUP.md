@@ -28,21 +28,80 @@ We recommend **Miniforge** because it is a lightweight, open-source installer fo
 
 3.  **Close and reopen your terminal.** This is a critical step to ensure that the changes to your system's configuration are loaded. After reopening, you should see `(base)` at the beginning of your terminal prompt, indicating that Conda is active.
 
-## Step 2: Create the Conda Environment from the YAML File
+## Step 2: Create the Conda Environment
 
-Now that Conda is installed, you can create the specific environment for this pipeline using the provided `environment.yml` recipe file.
+Now that Conda is installed, you can create the specific environment for this pipeline. We provide two methods.
 
-1.  **Navigate to the project directory** where you have cloned or downloaded the repository files (including `environment.yml`).
+### Option A: Using the Environment Recipe File (Recommended)
 
-2.  **Create the environment.** This single command will read the `environment.yml` file, automatically resolve all dependencies, and install every tool listed within a new environment named `bio_env`.
+This is the best practice for ensuring perfect reproducibility. You will first create a text file (`environment.yml`) that lists all software dependencies and then use it to build the environment.
+
+1.  **Create the `environment.yml` file** in your project directory using a text editor like `nano`:
+    ```bash
+    nano environment.yml
+    ```
+
+2.  **Copy the entire code block below and paste it into the nano editor.** The comments explain what each part of the file does.
+
+    ```yaml
+    # =============================================================================
+    # Conda Environment for the RNA-Seq Analysis Pipeline
+    #
+    # This file defines all the software needed to run the pipeline.
+    # =============================================================================
+
+    # The name of the Conda environment to be created.
+    name: bio_env
+
+    # The channels Conda will search for packages, in order of priority.
+    # conda-forge and bioconda are the community standards for scientific software.
+    channels:
+      - conda-forge
+      - bioconda
+      - defaults
+
+    # The list of all software packages (dependencies) to be installed.
+    dependencies:
+      # Core Bioinformatics Tools
+      - fastqc
+      - multiqc
+      - trimmomatic
+      - star
+
+      # Data Acquisition and Handling
+      - sra-tools
+      - pigz
+
+      # Strandedness Inference
+      - rseqc
+
+      # Utility Tools
+      - bc
+
+      # R Environment for Aggregation
+      - r-base
+      - r-dplyr
+      - r-readr
+    ```
+
+3.  **Save and exit the editor** (`Ctrl+X`, then `Y`, then `Enter`).
+
+4.  **Build the environment from the file.** This single command will read your recipe and build the `bio_env` environment.
     ```bash
     conda env create -f environment.yml
     ```
-    This process will take several minutes as Conda downloads and installs all the necessary packages.
+
+### Option B: Using a Single Command (Alternative)
+
+As an alternative, if you have cloned this repository and do not wish to create the `environment.yml` file manually, you can install all packages with a single, comprehensive command.
+
+```bash
+conda create -n bio_env -c conda-forge -c bioconda fastqc multiqc trimmomatic star sra-tools pigz r-base r-dplyr r-readr rseqc bc
+```
 
 ## Step 3: Activate the Environment
 
-Once the environment is created, you must **activate** it to start using the installed tools.
+Regardless of which method you used for creation, the final step is to activate the environment.
 
 1.  **Run the activation command:**
     ```bash
@@ -52,7 +111,7 @@ Once the environment is created, you must **activate** it to start using the ins
     ```
     (bio_env) your_username@your_machine:~$
     ```
-    This prefix confirms that you are now inside the dedicated `bio_env` environment and that all the tools required for the pipeline (`fastqc`, `star`, `rseqc`, etc.) are ready to be used.
+    This prefix confirms that you are now inside the dedicated `bio_env` environment and that all the tools required for the pipeline are ready to be used.
 
     *Note: You will need to run `conda activate bio_env` every time you open a new terminal session to work on this project.*
 
