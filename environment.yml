@@ -1,0 +1,43 @@
+# =============================================================================
+# Conda Environment for the RNA-Seq Analysis Pipeline
+#
+# To create this environment, navigate to the project directory and run:
+#   conda env create -f environment.yml
+#
+# To activate the environment, run:
+#   conda activate bio_env
+# =============================================================================
+
+name: bio_env
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # Core Bioinformatics Tools
+  # For QC, trimming, alignment, and quantification
+  - fastqc
+  - multiqc
+  - trimmomatic
+  - star
+
+  # Data Acquisition and Handling
+  # For downloading from SRA and efficient compression
+  - sra-tools
+  - pigz
+
+  # Strandedness Inference
+  # Provides infer_experiment.py for automated library type detection
+  - rseqc
+
+  # Utility Tools
+  # bc is a command-line calculator needed for floating-point comparisons in Bash
+  - bc
+
+  # R Environment for Aggregation
+  # The R language and specific libraries for the aggregate_counts.R script
+  - r-base
+  - r-dplyr
+  - r-readr
