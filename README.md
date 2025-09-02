@@ -1,4 +1,4 @@
-# RNA-Seq Analysis Pipeline
+# Fastq to Count Matrix for bulk RNAseq
 
 This repository contains a fully automated, robust, and reproducible pipeline for processing raw, paired-end RNA-Seq data from FASTQ files to a final gene-count matrix.
 
