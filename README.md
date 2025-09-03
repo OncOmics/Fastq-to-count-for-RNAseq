@@ -56,8 +56,6 @@ For example, you can download raw data from NCBI's SRA and dump fastqs.
 mkdir raw_data
 wget -P raw_data/ https://ftp.sra.ebi.ac.uk/vol1/fastq/ERR220/000/ERR2208890/ERR2208890_1.fastq.gz
 wget -P raw_data/ https://ftp.sra.ebi.ac.uk/vol1/fastq/ERR220/000/ERR2208890/ERR2208890_2.fastq.gz
-fasterq-dump SRR123456 --split-files --gzip -e 8 -p -O raw_data
-rm ~/ncbi/public/sra/SRR123456.sra
  ```
 
 2.  **Run the Pipeline**: Once everithing is set:
