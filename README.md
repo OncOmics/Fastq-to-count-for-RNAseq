@@ -1,4 +1,4 @@
-# Fastq-to-count-for-RNAseq
+# Fastq to Count Matrix for bulk RNAseq
 
 ## Overview
 
@@ -81,4 +81,4 @@ This repository is organized into several key files. Here is a map of what each 
 
 ## Citation
 
-PANEPUCCI, E.M.; ANZOLINI-CASSIANO, M.H. (2025). Fastq to Count Matrix for bulk RNAseq. GitHub. Retrieved from https://github.com/OncOmics/Fastq-to-count-for-RNAseq;
+PANEPUCCI, E.M.; ANZOLINI-CASSIANO, M.H. (2025). Fastq to Count Matrix for bulk RNAseq. GitHub. Retrieved from https://github.com/OncOmics/Fastq-to-count-for-RNAseq.
