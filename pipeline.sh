@@ -2,19 +2,58 @@
 set -euo pipefail
 
 # ==============================================================================
-# RNA-Seq Analysis Pipeline (Fully Automated Version)
+# RNA-Seq Analysis Pipeline (Fully Automated & Customizable)
 #
 # This script handles all steps from raw FASTQ to a final count matrix,
-# including an automated check for library strandedness.
-#
-# Usage:
-#   ./pipeline_rnaseq.sh [INPUT_DIR] [OUTPUT_DIR] [THREADS]
+# including an automated check for library strandedness and customizable parameters.
 # ==============================================================================
 
-# --- Parameters ---
-INPUT_DIR="${1:-.}"
-OUTPUT_DIR="${2:-./processed_files}"
-THREADS="${3:-4}"
+# --- Default Parameters ---
+INPUT_DIR=""
+OUTPUT_DIR=""
+THREADS=4
+STAR_RAM="20G"
+SJDB_OVERHANG=99
+
+# --- Help Message ---
+usage() {
+    echo "Usage: $0 --input <dir> --output <dir> [--threads <int>] [--ram <string>] [--overhang <int>]"
+    echo ""
+    echo "Required arguments:"
+    echo "  -i, --input      Directory containing raw .fastq.gz files."
+    echo "  -o, --output     Directory where results will be saved."
+    echo ""
+    echo "Optional arguments:"
+    echo "  -t, --threads    Number of threads to use. Default: ${THREADS}."
+    echo "  -r, --ram        Memory for STAR BAM sorting (e.g., '30G'). Default: ${STAR_RAM}."
+    echo "  -s, --overhang   Value for sjdbOverhang (Rule: read_length - 1). Default: ${SJDB_OVERHANG}."
+    echo "  -h, --help       Display this help message."
+    exit 1
+}
+
+# --- Parse Command-Line Arguments ---
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -i|--input) INPUT_DIR="$2"; shift ;;
+        -o|--output) OUTPUT_DIR="$2"; shift ;;
+        -t|--threads) THREADS="$2"; shift ;;
+        -r|--ram) STAR_RAM="$2"; shift ;;
+        -s|--overhang) SJDB_OVERHANG="$2"; shift ;;
+        -h|--help) usage ;;
+        *) echo "Unknown parameter passed: $1"; usage ;;
+    esac
+    shift
+done
+
+# --- Validate Required Arguments ---
+if [ -z "$INPUT_DIR" ] || [ -z "$OUTPUT_DIR" ]; then
+    echo "Error: --input and --output arguments are required."
+    echo ""
+    usage
+fi
+
+# --- Convert Human-Readable RAM to Bytes for STAR ---
+STAR_RAM_BYTES=$(echo "$STAR_RAM" | sed 's/G/000000000/' | sed 's/M/000000/' | sed 's/K/000/')
 
 # --- Output Directories ---
 MERGED_DIR="${OUTPUT_DIR}/01_merged_files"
@@ -36,7 +75,7 @@ mkdir -p "$MERGED_DIR" "$FASTQC_RAW_DIR" "$TRIMMED_DIR" "$FASTQC_TRIM_DIR" \
          "$REF_GENOME_DIR" "$STAR_INDEX_DIR" "$ALIGNED_DIR" "$FINAL_COUNTS_DIR"
 
 # ------------------------------------------------------------------------------
-# 1. Function: Merge or Link lanes, preserving compression [OPTIMIZED]
+# 1. Function: Merge or Link lanes [OPTIMIZED]
 # ------------------------------------------------------------------------------
 prepare_and_merge_lanes() {
     echo ">> STAGE 1: Preparing FASTQ files (Optimized with symbolic links)..."
@@ -57,7 +96,7 @@ prepare_and_merge_lanes() {
     echo "File preparation complete."
 }
 # ------------------------------------------------------------------------------
-# 2. Function: Quality Control with FastQC and MultiQC (Raw Data)
+# 2. Function: QC (Raw Data)
 # ------------------------------------------------------------------------------
 run_fastqc_raw() {
     echo ">> STAGE 2: Running FastQC on raw data..."
@@ -66,13 +105,13 @@ run_fastqc_raw() {
     echo "Raw data QC report generated."
 }
 # ------------------------------------------------------------------------------
-# 3. Function: Read Trimming with Trimmomatic
+# 3. Function: Read Trimming
 # ------------------------------------------------------------------------------
 run_trimming() {
-    echo ">> STAGE 3: Running Trimmomatic for adapter and quality trimming..."
+    echo ">> STAGE 3: Running Trimmomatic..."
     ADAPTERS_PATH="TruSeq3-PE-2.fa"
     if [ ! -f "$ADAPTERS_PATH" ]; then
-        echo "WARNING: Adapter file '$ADAPTERS_PATH' not found. Downloading a standard one..."
+        echo "WARNING: Adapter file '$ADAPTERS_PATH' not found. Downloading..."
         wget -q -O $ADAPTERS_PATH https://raw.githubusercontent.com/timflutre/trimmomatic/master/adapters/TruSeq3-PE-2.fa
     fi
     for r1_file in "$MERGED_DIR"/*_R1.fastq.gz; do
@@ -88,7 +127,7 @@ run_trimming() {
     echo "Trimming complete."
 }
 # ------------------------------------------------------------------------------
-# 4. Function: Quality Control with FastQC and MultiQC (Trimmed Data)
+# 4. Function: QC (Trimmed Data)
 # ------------------------------------------------------------------------------
 run_fastqc_trimmed() {
     echo ">> STAGE 4: Running FastQC on trimmed data..."
@@ -97,7 +136,7 @@ run_fastqc_trimmed() {
     echo "Trimmed data QC report generated."
 }
 # ------------------------------------------------------------------------------
-# 5. Function: Download and Prepare Reference Genome
+# 5. Function: Prepare Reference Genome
 # ------------------------------------------------------------------------------
 prepare_reference_genome() {
     echo ">> STAGE 5: Preparing reference genome..."
@@ -112,7 +151,7 @@ prepare_reference_genome() {
     fi
 }
 # ------------------------------------------------------------------------------
-# 6. Function: Index Reference Genome with STAR
+# 6. Function: Index Reference Genome
 # ------------------------------------------------------------------------------
 index_reference_genome() {
     echo ">> STAGE 6: Indexing genome with STAR..."
@@ -120,12 +159,14 @@ index_reference_genome() {
         echo "STAR index already exists. Skipping."
     else
         STAR --runThreadN "$THREADS" --runMode genomeGenerate --genomeDir "$STAR_INDEX_DIR" \
-             --genomeFastaFiles "$REF_GENOME_DIR/$GENOME_FA_NAME" --sjdbGTFfile "$REF_GENOME_DIR/$GENOME_GTF_NAME" --sjdbOverhang 99
+             --genomeFastaFiles "$REF_GENOME_DIR/$GENOME_FA_NAME" \
+             --sjdbGTFfile "$REF_GENOME_DIR/$GENOME_GTF_NAME" \
+             --sjdbOverhang "$SJDB_OVERHANG"
         echo "Indexing complete."
     fi
 }
 # ------------------------------------------------------------------------------
-# 7. Function: Align Reads and Quantify with STAR
+# 7. Function: Align Reads and Quantify
 # ------------------------------------------------------------------------------
 align_reads() {
     echo ">> STAGE 7: Aligning reads and quantifying with STAR..."
@@ -135,71 +176,48 @@ align_reads() {
         echo "Aligning sample: $sample"
         STAR --runMode alignReads --runThreadN "$THREADS" --genomeDir "$STAR_INDEX_DIR" \
              --readFilesIn "$r1_paired_file" "$r2_paired_file" --readFilesCommand zcat \
-             --limitBAMsortRAM 20000000000 --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts \
+             --limitBAMsortRAM "$STAR_RAM_BYTES" \
+             --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts \
              --outFileNamePrefix "${ALIGNED_DIR}/${sample}_"
     done
     echo "Alignment complete."
 }
-
 # ------------------------------------------------------------------------------
-# 8. Function: Automatically Determine Strandedness and Aggregate Counts
+# 8. Function: Auto Determine Strandedness and Aggregate Counts
 # ------------------------------------------------------------------------------
 determine_strandedness_and_aggregate() {
     echo ">> STAGE 8: Automatically determining library strandedness..."
-
-    # Find a single BAM file to test
     local test_bam_file=$(find "$ALIGNED_DIR" -name "*_Aligned.sortedByCoord.out.bam" | head -n 1)
     if [ -z "$test_bam_file" ]; then
-        echo "ERROR: No BAM files found to determine strandedness." >&2
-        exit 1
+        echo "ERROR: No BAM files found to determine strandedness." >&2; exit 1;
     fi
     echo "Using sample BAM file for test: $test_bam_file"
-
-    # Run infer_experiment.py and capture its output
-    # Redirect stderr to stdout (2>&1) to capture all output
     local output=$(infer_experiment.py -i "$test_bam_file" -r "$REF_GENOME_DIR/$GENOME_GTF_NAME" 2>&1)
-
-    # Parse the fractions from the output, setting to 0 if not found
     local frac_reverse=$(echo "$output" | grep 'Fraction of reads explained by "1+-,1-+"' | awk '{print $NF}' || echo "0")
     local frac_forward=$(echo "$output" | grep 'Fraction of reads explained by "1++,1--,2+-"' | awk '{print $NF}' || echo "0")
-
     local count_col=0
     local lib_type=""
-
-    # Decide which column to use based on a >0.80 threshold
     if (( $(echo "$frac_reverse > 0.80" | bc -l) )); then
-        count_col=4
-        lib_type="Stranded (Reverse)"
+        count_col=4; lib_type="Stranded (Reverse)";
     elif (( $(echo "$frac_forward > 0.80" | bc -l) )); then
-        count_col=3
-        lib_type="Stranded (Forward)"
+        count_col=3; lib_type="Stranded (Forward)";
     else
-        count_col=2
-        lib_type="Unstranded"
+        count_col=2; lib_type="Unstranded";
     fi
-
     echo "Library type determined as: $lib_type. Using column $count_col for counts."
-
-    # Find the path to the R script (assuming it's in the same directory as this script)
-    local script_dir=$(dirname "$(realpath "$0")")
+    local script_dir; script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
     local r_script="$script_dir/aggregate_counts.R"
-
     if [ ! -f "$r_script" ]; then
-        echo "ERROR: Aggregation script 'aggregate_counts.R' not found in the same directory as the main script." >&2
-        exit 1
+        echo "ERROR: 'aggregate_counts.R' not found. Ensure it's in the same directory as the main script." >&2; exit 1;
     fi
-
     echo ">> STAGE 9: Aggregating counts into final matrix..."
-    # Execute the R script with the determined column number
     "$r_script" "$ALIGNED_DIR" "$count_col" "${FINAL_COUNTS_DIR}/final_counts.tsv"
 }
-
 # ------------------------------------------------------------------------------
 # Main Pipeline Function
 # ------------------------------------------------------------------------------
 main() {
     echo "--- STARTING RNA-SEQ PIPELINE (FULLY AUTOMATED MODE) ---"
-    
     prepare_and_merge_lanes
     run_fastqc_raw
     run_trimming
@@ -208,7 +226,6 @@ main() {
     index_reference_genome
     align_reads
     determine_strandedness_and_aggregate
-    
     echo -e "\n--- PIPELINE COMPLETED SUCCESSFULLY! ---\n\nKey Results:\n  - BAM Alignments: ${ALIGNED_DIR}/\n  - Final Count Matrix: ${FINAL_COUNTS_DIR}/final_counts.tsv\n  - QC Reports: ${FASTQC_RAW_DIR}/ and ${FASTQC_TRIM_DIR}/\n-----------------------------------------"
 }
 
