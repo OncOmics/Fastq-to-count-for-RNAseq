@@ -1,6 +1,6 @@
 # Fastq to Count Matrix for bulk RNAseq
 
-[![DOI](https://zenodo.org/badge/DOI/YOUR_DOI_HERE.svg)](https://doi.org/YOUR_DOI_HERE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17057667.svg)](https://doi.org/10.5281/zenodo.17057667)
 <!--
 NOTE: This DOI badge is a placeholder. After your first release,
 you will get a real DOI from Zenodo to replace the link and text here.
