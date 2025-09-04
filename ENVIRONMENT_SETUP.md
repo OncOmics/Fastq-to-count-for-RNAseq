@@ -88,16 +88,16 @@ This is the best practice for ensuring perfect reproducibility. You will first c
 
 4.  **Build the environment from the file.** This single command will read your recipe and build the `bio_env` environment.
     ```bash
-    conda env create -f environment.yml
+    mamba env create -f environment.yml
     ```
 
 ### Option B: Using a Single Command (Alternative)
 
 As an alternative, if you have cloned this repository and do not wish to create the `environment.yml` file manually, you can install all packages with a single, comprehensive command.
 
-```bash
-conda create -n bio_env -c conda-forge -c bioconda fastqc multiqc trimmomatic star sra-tools pigz r-base r-dplyr r-readr rseqc bc
-```
+    ```bash
+    mamba create -n bio_env -c conda-forge -c bioconda fastqc multiqc trimmomatic star sra-tools pigz r-base r-dplyr r-readr rseqc bc
+    ```
 
 ## Step 3: Activate the Environment
 
