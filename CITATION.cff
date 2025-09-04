@@ -21,6 +21,9 @@ authors:
   - family-names: "Anzolini-Cassiano"
     given-names: "M.H."
     orcid: "https://orcid.org/0000-0001-7123-3985"
+  - family-names: "Malta"
+    given-names: "Tathiane Maistro"
+    orcid: "https://orcid.org/0000-0003-1129-5791"
 
 # --- Repository and License Information ---
 license: "MIT"
