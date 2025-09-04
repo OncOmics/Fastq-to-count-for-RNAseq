@@ -1,0 +1,27 @@
+# ==============================================================================
+# Citation File for the RNA-Seq Analysis Pipeline
+#
+# See https://citation-file-format.github.io/ for more details.
+# ==============================================================================
+
+cff-version: 1.2.0
+message: "If you use this software in your research, please cite it as below."
+
+# --- Core Information ---
+title: "Fastq to Count Matrix for bulk RNAseq"
+version: 1.0.0
+doi: 10.5281/zenodo.YOUR_DOI_HERE
+date-released: "[YYYY-MM-DD]"
+
+# --- Author Information ---
+authors:
+  - family-names: "Panepucci"
+    given-names: "Enzo M."
+    orcid: "https://orcid.org/0000-0002-2322-6366"
+  - family-names: "Anzolini-Cassiano"
+    given-names: "M.H."
+    orcid: "https://orcid.org/0000-0001-7123-3985"
+
+# --- Repository and License Information ---
+license: "MIT"
+repository-code: "https://github.com/OncOmics/Fastq-to-count-for-RNAseq"
