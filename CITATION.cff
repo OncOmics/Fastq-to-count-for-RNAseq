@@ -11,7 +11,7 @@ message: "If you use this software in your research, please cite it as below."
 title: "Fastq to Count Matrix for bulk RNAseq"
 version: 1.0.0
 doi: 10.5281/zenodo.17057667
-date-released: 04/09/2025
+date-released: 2025-09-04
 
 # --- Author Information ---
 authors:
