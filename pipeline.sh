@@ -118,14 +118,32 @@ run_fastqc_raw() {
 # ------------------------------------------------------------------------------
 run_trimming() {
     echo ">> STAGE 3: Running Trimmomatic..."
+    
+    local source_dir=""
+
+    # Determine the correct source directory
+    if ls "$MERGED_DIR"/*_R1.fastq.gz &> /dev/null || ls "$MERGED_DIR"/*_1.fastq.gz &> /dev/null; then
+        echo "Found pre-processed files in $MERGED_DIR. Using them as input."
+        source_dir="$MERGED_DIR"
+    else
+        echo "No pre-processed files found. Using original input directory: $INPUT_DIR."
+        source_dir="$INPUT_DIR"
+    fi
+
     ADAPTERS_PATH="TruSeq3-PE-2.fa"
     if [ ! -f "$ADAPTERS_PATH" ]; then
         echo "WARNING: Adapter file '$ADAPTERS_PATH' not found. Downloading..."
         wget -q -O $ADAPTERS_PATH https://raw.githubusercontent.com/timflutre/trimmomatic/master/adapters/TruSeq3-PE-2.fa
     fi
-    for r1_file in "$MERGED_DIR"/*_R1.fastq.gz; do
-        sample=$(basename "$r1_file" _R1.fastq.gz)
-        r2_file="${MERGED_DIR}/${sample}_R2.fastq.gz"
+
+    for r1_file in "$source_dir"/*_R1.fastq.gz "$source_dir"/*_1.fastq.gz; do
+        [ -e "$r1_file" ] || continue
+        
+        local sample=$(basename "$r1_file" | sed -E 's/(_L[0-9]+)?_([Rr])?[1](_001)?\.fastq\.gz$//')
+        local r2_file=$(find "$source_dir" -name "${sample}*_[Rr]2*.fastq.gz" -o -name "${sample}*_2.fastq.gz" | head -n 1)
+        
+        if [ -z "$r2_file" ]; then echo "WARNING: R2 file for $sample not found. Skipping trimming."; continue; fi
+
         echo "Trimming sample: $sample"
         trimmomatic PE -threads "$THREADS" -trimlog "${TRIMMED_DIR}/trimlog_${sample}.txt" \
             "$r1_file" "$r2_file" \
@@ -179,12 +197,37 @@ index_reference_genome() {
 # ------------------------------------------------------------------------------
 align_reads() {
     echo ">> STAGE 7: Aligning reads and quantifying with STAR..."
-    for r1_paired_file in "$TRIMMED_DIR"/*_1P.fastq.gz; do
-        sample=$(basename "$r1_paired_file" _1P.fastq.gz)
-        r2_paired_file="${TRIMMED_DIR}/${sample}_2P.fastq.gz"
+    
+    local source_dir=""
+    local file_pattern=""
+
+    # Determine the correct source directory and file patterns to use, in order of preference
+    if ls "$TRIMMED_DIR"/*_1P.fastq.gz &> /dev/null; then
+        echo "Using trimmed files from $TRIMMED_DIR as input."
+        source_dir="$TRIMMED_DIR"
+        file_pattern="_1P.fastq.gz"
+    elif ls "$MERGED_DIR"/*_R1.fastq.gz &> /dev/null || ls "$MERGED_DIR"/*_1.fastq.gz &> /dev/null; then
+        echo "No trimmed files found. Using merged/linked files from $MERGED_DIR as input."
+        source_dir="$MERGED_DIR"
+        file_pattern="_{R1,1}.fastq.gz"
+    else
+        echo "No processed files found. Using original raw files from $INPUT_DIR as input."
+        source_dir="$INPUT_DIR"
+        file_pattern="_{R1,1}.fastq.gz"
+    fi
+
+    for r1_file in "$source_dir"/*"$file_pattern"; do
+        [ -e "$r1_file" ] || continue
+        
+        # Determine sample name and find matching R2 file
+        local sample=$(basename "$r1_file" | sed -E 's/(_1P|_R1|_1)\.fastq\.gz$//')
+        local r2_file=$(find "$source_dir" -name "${sample}*_[2P|R2|2].fastq.gz" | head -n 1)
+
+        if [ -z "$r2_file" ]; then echo "WARNING: R2 file for $sample not found. Skipping alignment."; continue; fi
+
         echo "Aligning sample: $sample"
         STAR --runMode alignReads --runThreadN "$THREADS" --genomeDir "$STAR_INDEX_DIR" \
-             --readFilesIn "$r1_paired_file" "$r2_paired_file" --readFilesCommand zcat \
+             --readFilesIn "$r1_file" "$r2_file" --readFilesCommand zcat \
              --limitBAMsortRAM "$STAR_RAM_BYTES" \
              --outSAMtype BAM SortedByCoordinate --quantMode GeneCounts \
              --outFileNamePrefix "${ALIGNED_DIR}/${sample}_"
