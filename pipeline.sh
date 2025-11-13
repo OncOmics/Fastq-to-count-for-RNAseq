@@ -100,7 +100,16 @@ prepare_and_merge_lanes() {
 # ------------------------------------------------------------------------------
 run_fastqc_raw() {
     echo ">> STAGE 2: Running FastQC on raw data..."
-    fastqc "$MERGED_DIR"/*.fastq.gz -o "$FASTQC_RAW_DIR" --threads "$THREADS"
+    
+    # Check if files exist in the merged directory
+    if ls "$MERGED_DIR"/*.fastq.gz &> /dev/null; then
+        echo "Found pre-processed files in $MERGED_DIR. Using them as input."
+        fastqc "$MERGED_DIR"/*.fastq.gz -o "$FASTQC_RAW_DIR" --threads "$THREADS"
+    else
+        echo "No pre-processed files found. Using original input directory: $INPUT_DIR."
+        fastqc "$INPUT_DIR"/*.fastq.gz -o "$FASTQC_RAW_DIR" --threads "$THREADS"
+    fi
+    
     multiqc "$FASTQC_RAW_DIR" -o "$FASTQC_RAW_DIR" --force -n "multiqc_report_raw"
     echo "Raw data QC report generated."
 }
